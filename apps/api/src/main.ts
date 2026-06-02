@@ -1,6 +1,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -20,6 +21,9 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // One consistent error shape for HTTP + Prisma errors.
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // Let Prisma close its connection cleanly on app shutdown.
   app.enableShutdownHooks();
