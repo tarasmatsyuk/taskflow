@@ -10,10 +10,23 @@ export default function Home() {
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+    const [projects, setProjects] = useState<any[]>([]);
+
+
   useEffect(() => {
     fetch(`${API}/health`)
       .then((res) => res.json())
       .then(setHealth)
+      .catch((e) => setError(e.message));
+  }, []);
+
+    useEffect(() => {
+    fetch(`${API}/projects?limit=10`)
+      .then((res) => res.json())
+      .then(res => {
+        setProjects(res.data); 
+        console.log(projects);
+      })
       .catch((e) => setError(e.message));
   }, []);
 
@@ -38,6 +51,11 @@ export default function Home() {
           </p>
         )}
       </div>
+      <ul>
+        {projects.map(project => (
+          <li key={project.id}>{project.name} ({project.status})</li>
+        ))}
+      </ul>
     </main>
   );
 }
