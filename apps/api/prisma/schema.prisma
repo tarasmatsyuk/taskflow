@@ -1,0 +1,43 @@
+// TaskFlow — Prisma schema
+// M1 iteration 1: User + Project. Auth fields land in M2; Tasks/members in M3.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7: connection URL lives in prisma.config.ts (Migrate) and is passed
+  // to PrismaClient via the pg driver adapter at runtime.
+}
+
+enum ProjectStatus {
+  ACTIVE
+  REVIEW
+  ARCHIVED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  key         String        @unique
+  name        String
+  description String?
+  color       String        @default("#c2f24f")
+  status      ProjectStatus @default(ACTIVE)
+  ownerId     String
+  owner       User          @relation(fields: [ownerId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([ownerId])
+}
