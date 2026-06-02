@@ -21,11 +21,11 @@ export default function Home() {
   }, []);
 
     useEffect(() => {
-    fetch(`${API}/projects?limit=10`)
+    fetch(`${API}/projects`)
       .then((res) => res.json())
       .then(res => {
         setProjects(res.data); 
-        console.log(projects);
+        console.log(res);
       })
       .catch((e) => setError(e.message));
   }, []);
@@ -52,7 +52,7 @@ export default function Home() {
         )}
       </div>
       <ul>
-        {projects.map(project => (
+        {projects?.map(project => (
           <li key={project.id}>{project.name} ({project.status})</li>
         ))}
       </ul>

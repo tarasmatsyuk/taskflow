@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ProjectStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
@@ -14,35 +15,40 @@ export enum SortOrder {
 }
 
 export class QueryProjectsDto {
-  // Pagination (1-based). Query params arrive as strings → @Type coerces to number.
+  @ApiPropertyOptional({ minimum: 1, default: 1, description: '1-based page.' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page = 1;
 
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 50 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(100)
-  limit = 20;
+  limit = 50;
 
-  // Filtering
+  @ApiPropertyOptional({ enum: ProjectStatus, description: 'Filter by status.' })
   @IsOptional()
   @IsEnum(ProjectStatus)
   status?: ProjectStatus;
 
-  // Case-insensitive match on name OR key.
+  @ApiPropertyOptional({
+    description: 'Case-insensitive match on name OR key.',
+    example: 'site',
+  })
   @IsOptional()
   @IsString()
   search?: string;
 
-  // Sorting
+  @ApiPropertyOptional({ enum: ProjectSortBy, default: ProjectSortBy.createdAt })
   @IsOptional()
   @IsEnum(ProjectSortBy)
   sortBy: ProjectSortBy = ProjectSortBy.createdAt;
 
+  @ApiPropertyOptional({ enum: SortOrder, default: SortOrder.desc })
   @IsOptional()
   @IsEnum(SortOrder)
   sortOrder: SortOrder = SortOrder.desc;
