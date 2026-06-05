@@ -1,16 +1,19 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, ProjectStatus } from '@prisma/client';
+import { PrismaClient, ProjectStatus, UserRole } from '@prisma/client';
+import * as argon2 from 'argon2';
 
 // Prisma 7: the client talks to Postgres through a driver adapter.
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-// Demo owner — stands in for the authenticated user until M2 adds real auth.
+// Demo owner — log in with this in M2: taras@taskflow.dev / password123
 const DEMO_USER = {
   email: 'taras@taskflow.dev',
   name: 'Taras K.',
+  role: UserRole.ADMIN,
 };
+const DEMO_PASSWORD = 'password123';
 
 // The 5 projects from the mockups (taskflow-mockups.html).
 const PROJECTS = [
@@ -53,10 +56,11 @@ const PROJECTS = [
 ];
 
 async function main() {
+  const passwordHash = await argon2.hash(DEMO_PASSWORD);
   const owner = await prisma.user.upsert({
     where: { email: DEMO_USER.email },
-    update: { name: DEMO_USER.name },
-    create: DEMO_USER,
+    update: { name: DEMO_USER.name, role: DEMO_USER.role, passwordHash },
+    create: { ...DEMO_USER, passwordHash },
   });
 
   for (const project of PROJECTS) {

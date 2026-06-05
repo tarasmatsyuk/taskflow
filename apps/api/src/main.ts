@@ -33,14 +33,16 @@ async function bootstrap() {
   // explicitly → served at /api/docs (JSON at /api/docs-json).
   const swaggerConfig = new DocumentBuilder()
     .setTitle('TaskFlow API')
-    .setDescription('TaskFlow REST API — projects (M1), more to come.')
+    .setDescription('TaskFlow REST API')
     .setVersion('1.0')
+    .addBearerAuth()
+    .addTag('auth')
     .addTag('projects')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup(`${globalPrefix}/docs`, app, document);
 
-  const port = process.env.PORT || 3333;
+  const port = process.env.PORT || 4200;
   await app.listen(port);
   Logger.log(`🚀 Application is running on: http://localhost:${port}/${globalPrefix}`);
 }
