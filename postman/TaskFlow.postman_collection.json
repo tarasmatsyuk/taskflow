@@ -1,0 +1,222 @@
+{
+  "info": {
+    "name": "TaskFlow API",
+    "description": "TaskFlow API — Auth (M2) + Projects CRUD (M1).\n\nSetup:\n1. Start infra + API: `pnpm db:up` then `pnpm dev:api` (http://localhost:4200/api).\n2. Run **Auth → Login** first (taras@taskflow.dev / password123). Its test script saves `accessToken` + `refreshToken` into collection variables.\n3. Protected requests (Create/Update/Delete project, Logout, Me) send `Authorization: Bearer {{accessToken}}` automatically.\n4. When the access token expires (15m), run **Auth → Refresh** to rotate — it overwrites both token variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4200/api", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "refreshToken", "value": "", "type": "string" },
+    { "key": "projectId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "if (b.accessToken) pm.collectionVariables.set('accessToken', b.accessToken);",
+                  "if (b.refreshToken) pm.collectionVariables.set('refreshToken', b.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alex@taskflow.dev\",\n  \"name\": \"Alex Doe\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "description": "Create an account. Returns the user + access/refresh tokens (saved to variables)."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('accessToken', b.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', b.refreshToken);",
+                  "console.log('Logged in as', b.user.email, '(', b.user.role, ')');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"taras@taskflow.dev\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Seeded admin login. Saves accessToken + refreshToken to collection variables."
+          }
+        },
+        {
+          "name": "Refresh (rotate)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('accessToken', b.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', b.refreshToken);",
+                  "console.log('Rotated tokens. Old refresh is now invalid.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{refreshToken}}" }],
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"] },
+            "description": "Send the REFRESH token as Bearer. Returns a new pair and rotates (old refresh token stops working)."
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] },
+            "description": "Current authenticated user (sanitized — no password/refresh hash)."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"] },
+            "description": "Clears the stored refresh token; future refreshes return 401."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "Create Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "if (b && b.id) { pm.collectionVariables.set('projectId', b.id); console.log('Saved projectId =', b.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"NEW\",\n  \"name\": \"New Project\",\n  \"description\": \"Created from Postman\",\n  \"color\": \"#38bdf8\",\n  \"status\": \"ACTIVE\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/projects", "host": ["{{baseUrl}}"], "path": ["projects"] },
+            "description": "Requires auth (Bearer access token). Owner = the authenticated user. `key` must be unique (duplicate → 409)."
+          }
+        },
+        {
+          "name": "List Projects",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has data + meta', () => { const b = pm.response.json(); pm.expect(b).to.have.property('data'); pm.expect(b).to.have.property('meta'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/projects?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "ACTIVE", "description": "ACTIVE | REVIEW | ARCHIVED", "disabled": true },
+                { "key": "search", "value": "site", "description": "case-insensitive name OR key", "disabled": true },
+                { "key": "sortBy", "value": "name", "description": "createdAt | name | key", "disabled": true },
+                { "key": "sortOrder", "value": "asc", "description": "asc | desc", "disabled": true }
+              ]
+            },
+            "description": "Public. Paginated/filterable/sortable. Returns { data, meta }."
+          }
+        },
+        {
+          "name": "Get Project by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/projects/{{projectId}}", "host": ["{{baseUrl}}"], "path": ["projects", "{{projectId}}"] },
+            "description": "Public. Unknown id → 404."
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"REVIEW\",\n  \"name\": \"Renamed from Postman\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/projects/{{projectId}}", "host": ["{{baseUrl}}"], "path": ["projects", "{{projectId}}"] },
+            "description": "Owner/admin only (JwtAuthGuard + ProjectMemberGuard). Non-owner → 403."
+          }
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{baseUrl}}/projects/{{projectId}}", "host": ["{{baseUrl}}"], "path": ["projects", "{{projectId}}"] },
+            "description": "Owner/admin only. 204 on success; non-owner → 403."
+          }
+        }
+      ]
+    }
+  ]
+}

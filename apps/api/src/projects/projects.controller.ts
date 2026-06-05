@@ -8,8 +8,10 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
@@ -17,6 +19,9 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ProjectMemberGuard } from '../auth/guards/project-member.guard';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { QueryProjectsDto } from './dto/query-projects.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -29,10 +34,12 @@ export class ProjectsController {
   constructor(private readonly projects: ProjectsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a project' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a project (owned by the current user)' })
   @ApiCreatedResponse({ type: ProjectEntity })
-  create(@Body() dto: CreateProjectDto) {
-    return this.projects.create(dto);
+  create(@CurrentUser('sub') ownerId: string, @Body() dto: CreateProjectDto) {
+    return this.projects.create(dto, ownerId);
   }
 
   @Get()
@@ -51,7 +58,9 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update a project' })
+  @UseGuards(JwtAuthGuard, ProjectMemberGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a project (owner/admin only)' })
   @ApiOkResponse({ type: ProjectEntity })
   @ApiNotFoundResponse({ description: 'Project not found' })
   update(@Param('id') id: string, @Body() dto: UpdateProjectDto) {
@@ -59,8 +68,10 @@ export class ProjectsController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, ProjectMemberGuard)
   @HttpCode(204)
-  @ApiOperation({ summary: 'Delete a project' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a project (owner/admin only)' })
   @ApiNoContentResponse({ description: 'Deleted' })
   @ApiNotFoundResponse({ description: 'Project not found' })
   remove(@Param('id') id: string) {

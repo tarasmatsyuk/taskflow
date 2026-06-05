@@ -1,5 +1,5 @@
 // TaskFlow — Prisma schema
-// M1 iteration 1: User + Project. Auth fields land in M2; Tasks/members in M3.
+// M1: User + Project. M2: auth fields on User. Tasks/members land in M3.
 
 generator client {
   provider = "prisma-client-js"
@@ -17,10 +17,20 @@ enum ProjectStatus {
   ARCHIVED
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String
+  role      UserRole @default(USER)
+  // Nullable: pre-auth seed rows (and future OAuth users) have no local password.
+  passwordHash       String?
+  // Hashed (argon2) current refresh token; rotated on /auth/refresh, null on logout.
+  hashedRefreshToken String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -41,10 +41,5 @@ export class CreateProjectDto {
   @IsEnum(ProjectStatus)
   status?: ProjectStatus;
 
-  @ApiPropertyOptional({
-    description: 'Owner user id. TODO(M2): derived from the authenticated user.',
-  })
-  @IsOptional()
-  @IsString()
-  ownerId?: string;
+  // Owner is taken from the authenticated user (M2), not the request body.
 }

@@ -9,8 +9,7 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateProjectDto) {
-    const ownerId = dto.ownerId ?? (await this.defaultOwnerId());
+  async create(dto: CreateProjectDto, ownerId: string) {
     return this.prisma.project.create({ data: { ...dto, ownerId } });
   }
 
@@ -64,14 +63,5 @@ export class ProjectsService {
   async remove(id: string) {
     await this.findOne(id); // 404 if missing
     await this.prisma.project.delete({ where: { id } });
-  }
-
-  // TODO(M2): replace with the authenticated user via @CurrentUser().
-  private async defaultOwnerId() {
-    const user = await this.prisma.user.findFirst();
-    if (!user) {
-      throw new NotFoundException('No user found — run `pnpm db:seed` first');
-    }
-    return user.id;
   }
 }

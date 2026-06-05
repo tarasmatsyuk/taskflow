@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4200/api';
 
 type Health = { status: string; service: string; timestamp: string };
 

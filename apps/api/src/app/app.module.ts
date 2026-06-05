@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { AppController } from './app.controller';
@@ -10,6 +11,7 @@ import { HealthController } from './health.controller';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    AuthModule,
     ProjectsModule,
   ],
   controllers: [AppController, HealthController],
