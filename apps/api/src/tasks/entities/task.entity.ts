@@ -1,6 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { TaskPriority, TaskStatus } from '@prisma/client';
 
+/** Trimmed assignee included with task reads (no secrets). */
+export class TaskAssignee {
+  @ApiProperty() id!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty() email!: string;
+}
+
 /** Response shape for a Task (mirrors the Prisma model). */
 export class TaskEntity {
   @ApiProperty({ example: 'cmq0t2amb00006jma06b8yr1t' })
@@ -32,6 +39,9 @@ export class TaskEntity {
 
   @ApiProperty({ nullable: true })
   assigneeId!: string | null;
+
+  @ApiProperty({ nullable: true, type: () => TaskAssignee })
+  assignee!: TaskAssignee | null;
 
   @ApiProperty({ nullable: true, type: String, format: 'date-time' })
   deletedAt!: Date | null;
