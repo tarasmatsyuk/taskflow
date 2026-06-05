@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { MemberRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { QueryProjectsDto } from './dto/query-projects.dto';
@@ -10,7 +10,14 @@ export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateProjectDto, ownerId: string) {
-    return this.prisma.project.create({ data: { ...dto, ownerId } });
+    // Create the project and register its creator as an OWNER member atomically.
+    return this.prisma.$transaction(async (tx) => {
+      const project = await tx.project.create({ data: { ...dto, ownerId } });
+      await tx.projectMember.create({
+        data: { projectId: project.id, userId: ownerId, role: MemberRole.OWNER },
+      });
+      return project;
+    });
   }
 
   async findAll(query: QueryProjectsDto) {

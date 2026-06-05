@@ -10,9 +10,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../types/jwt-payload';
 
 /**
- * M2: only the project owner (or an ADMIN) may mutate a project.
- * M3 will broaden "owner" to "member" once ProjectMember exists.
- * Expects a route param :id and a JwtAuthGuard ahead of it (req.user set).
+ * Only members of the project (or a global ADMIN) may touch it.
+ * Resolves the project id from :projectId (nested task/member routes) or
+ * :id (project routes). Requires JwtAuthGuard ahead of it (req.user set).
+ * Attaches req.project and req.membership for downstream use.
  */
 @Injectable()
 export class ProjectMemberGuard implements CanActivate {
@@ -21,7 +22,7 @@ export class ProjectMemberGuard implements CanActivate {
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest();
     const user = req.user as JwtPayload;
-    const projectId = req.params.id as string;
+    const projectId = (req.params.projectId ?? req.params.id) as string;
 
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -29,12 +30,18 @@ export class ProjectMemberGuard implements CanActivate {
     if (!project) {
       throw new NotFoundException(`Project ${projectId} not found`);
     }
-    if (project.ownerId !== user.sub && user.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('You do not have access to this project');
+
+    const membership = await this.prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId: user.sub } },
+    });
+
+    if (!membership && user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('You are not a member of this project');
     }
 
-    // Reuse downstream to avoid a second fetch.
+    // Reuse downstream (e.g. role checks) and avoid refetching.
     req.project = project;
+    req.membership = membership; // null when a global ADMIN isn't a member
     return true;
   }
 }
