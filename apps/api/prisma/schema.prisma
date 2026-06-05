@@ -99,7 +99,8 @@ model Task {
   updatedAt   DateTime     @updatedAt
 
   @@unique([projectId, number])
-  @@index([projectId, status])
+  // Covers the board query: WHERE projectId (+ status) ORDER BY status, order.
+  @@index([projectId, status, order])
   @@index([assigneeId])
 }
 
