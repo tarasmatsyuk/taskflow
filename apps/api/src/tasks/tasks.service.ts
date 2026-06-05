@@ -50,6 +50,12 @@ export class TasksService {
     });
   }
 
+  // Fetch the assignee in the SAME query (one extra JOIN) instead of letting
+  // callers load each task's assignee separately → avoids an N+1.
+  private static readonly withAssignee = {
+    assignee: { select: { id: true, name: true, email: true } },
+  };
+
   findAll(projectId: string, query: QueryTasksDto) {
     return this.prisma.task.findMany({
       where: {
@@ -58,6 +64,7 @@ export class TasksService {
         assigneeId: query.assigneeId,
         deletedAt: null, // soft-deleted tasks are hidden from normal reads
       },
+      include: TasksService.withAssignee,
       orderBy: [{ status: 'asc' }, { order: 'asc' }],
     });
   }
@@ -67,6 +74,7 @@ export class TasksService {
     // Excludes soft-deleted tasks → a deleted task reads as 404.
     const task = await this.prisma.task.findFirst({
       where: { id, projectId, deletedAt: null },
+      include: TasksService.withAssignee,
     });
     if (!task) {
       throw new NotFoundException(`Task ${id} not found in project ${projectId}`);
