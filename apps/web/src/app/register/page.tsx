@@ -1,4 +1,5 @@
 'use client';
+import axios, { type AxiosError } from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -21,19 +22,17 @@ export default function RegisterPage() {
 
   async function onSubmit(values: RegisterForm) {
     setServerError(null);
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(values),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      const msg = Array.isArray(data?.message) ? data.message[0] : data?.message;
-      setServerError(typeof msg === 'string' ? msg : 'Registration failed');
-      return;
+    try {
+      await axios.post('/api/auth/register', values);
+      router.replace('/projects');
+      router.refresh();
+    } catch (err) {
+      const message = (err as AxiosError<{ message?: string | string[] }>)
+        .response?.data?.message;
+      setServerError(
+        Array.isArray(message) ? message[0] : message ?? 'Registration failed',
+      );
     }
-    router.replace('/projects');
-    router.refresh();
   }
 
   return (

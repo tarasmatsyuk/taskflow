@@ -1,4 +1,5 @@
 'use client';
+import axios, { type AxiosError } from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -21,20 +22,18 @@ export default function LoginPage() {
 
   async function onSubmit(values: LoginForm) {
     setServerError(null);
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(values),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
+    try {
+      // Same-origin call to the BFF route handler (not the Nest API directly).
+      await axios.post('/api/auth/login', values);
+      router.replace('/projects');
+      router.refresh();
+    } catch (err) {
+      const message = (err as AxiosError<{ message?: string | string[] }>)
+        .response?.data?.message;
       setServerError(
-        typeof data?.message === 'string' ? data.message : 'Login failed',
+        Array.isArray(message) ? message[0] : message ?? 'Login failed',
       );
-      return;
     }
-    router.replace('/projects');
-    router.refresh();
   }
 
   return (

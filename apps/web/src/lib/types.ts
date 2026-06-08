@@ -15,3 +15,29 @@ export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
 }
+
+export type ProjectStatus = 'ACTIVE' | 'REVIEW' | 'ARCHIVED';
+
+export interface Project {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  color: string;
+  status: ProjectStatus;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PageMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface Paginated<T> {
+  data: T[];
+  meta: PageMeta;
+}

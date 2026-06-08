@@ -1,4 +1,5 @@
 'use client';
+import axios from 'axios';
 import { useRouter } from 'next/navigation';
 
 export function LogoutButton() {
@@ -7,7 +8,7 @@ export function LogoutButton() {
     <button
       className="btn compact"
       onClick={async () => {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        await axios.post('/api/auth/logout');
         router.replace('/login');
         router.refresh();
       }}
