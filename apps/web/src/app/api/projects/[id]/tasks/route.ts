@@ -15,3 +15,17 @@ export async function GET(
   });
   return NextResponse.json(res.data, { status: res.status });
 }
+
+// Create a task in the project.
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const body = await req.json();
+  const token = await getAccessToken();
+  const res = await api.post(`/projects/${id}/tasks`, body, {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+  });
+  return NextResponse.json(res.data, { status: res.status });
+}

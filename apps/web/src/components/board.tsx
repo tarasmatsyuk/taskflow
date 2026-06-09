@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { useState } from 'react';
 import type { Task, TaskPriority, TaskStatus } from '../lib/types';
+import { TaskModal } from './task-modal';
 
 const COLUMNS: { status: TaskStatus; name: string; dot: string }[] = [
   { status: 'BACKLOG', name: 'Backlog', dot: 'var(--faint)' },
@@ -58,7 +59,15 @@ function CardView({ task, projectKey }: { task: Task; projectKey: string }) {
   );
 }
 
-function DraggableCard({ task, projectKey }: { task: Task; projectKey: string }) {
+function DraggableCard({
+  task,
+  projectKey,
+  onOpen,
+}: {
+  task: Task;
+  projectKey: string;
+  onOpen: (task: Task) => void;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
     data: { task },
@@ -68,6 +77,7 @@ function DraggableCard({ task, projectKey }: { task: Task; projectKey: string })
       ref={setNodeRef}
       className="card"
       style={{ opacity: isDragging ? 0.4 : 1, cursor: 'grab' }}
+      onClick={() => onOpen(task)}
       {...listeners}
       {...attributes}
     >
@@ -82,12 +92,14 @@ function Column({
   dot,
   tasks,
   projectKey,
+  onOpen,
 }: {
   status: TaskStatus;
   name: string;
   dot: string;
   tasks: Task[];
   projectKey: string;
+  onOpen: (task: Task) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
@@ -99,7 +111,7 @@ function Column({
       </div>
       <div ref={setNodeRef} className={`col-body${isOver ? ' col-over' : ''}`}>
         {tasks.map((t) => (
-          <DraggableCard key={t.id} task={t} projectKey={projectKey} />
+          <DraggableCard key={t.id} task={t} projectKey={projectKey} onOpen={onOpen} />
         ))}
         {tasks.length === 0 && <p className="col-empty">Drop here</p>}
       </div>
@@ -118,6 +130,8 @@ export function Board({
 }) {
   const queryClient = useQueryClient();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  // null = closed; { task } = edit; {} = create.
+  const [modal, setModal] = useState<{ task?: Task } | null>(null);
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks', projectId],
@@ -183,26 +197,42 @@ export function Board({
   }
 
   return (
-    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div className="board">
-        {COLUMNS.map((col) => (
-          <Column
-            key={col.status}
-            status={col.status}
-            name={col.name}
-            dot={col.dot}
-            tasks={byStatus(col.status)}
-            projectKey={projectKey}
-          />
-        ))}
+    <>
+      <div className="board-toolbar">
+        <button className="btn compact" onClick={() => setModal({})}>
+          + New task
+        </button>
       </div>
-      <DragOverlay>
-        {activeTask ? (
-          <div className="card" style={{ cursor: 'grabbing' }}>
-            <CardView task={activeTask} projectKey={projectKey} />
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <div className="board">
+          {COLUMNS.map((col) => (
+            <Column
+              key={col.status}
+              status={col.status}
+              name={col.name}
+              dot={col.dot}
+              tasks={byStatus(col.status)}
+              projectKey={projectKey}
+              onOpen={(task) => setModal({ task })}
+            />
+          ))}
+        </div>
+        <DragOverlay>
+          {activeTask ? (
+            <div className="card" style={{ cursor: 'grabbing' }}>
+              <CardView task={activeTask} projectKey={projectKey} />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      {modal && (
+        <TaskModal
+          projectId={projectId}
+          task={modal.task}
+          onClose={() => setModal(null)}
+        />
+      )}
+    </>
   );
 }
