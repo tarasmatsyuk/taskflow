@@ -95,8 +95,9 @@ a { color: inherit; text-decoration: none; }
 .col-dot { width: 8px; height: 8px; border-radius: 50%; }
 .col-name { font-weight: 700; font-size: 13px; }
 .col-count { font-family: ui-monospace, monospace; font-size: 11px; color: var(--faint); background: var(--surface); padding: 1px 7px; border-radius: 6px; }
-.col-body { display: flex; flex-direction: column; gap: 10px; }
-.col-empty { color: var(--faint); font-size: 12.5px; padding: 4px; }
+.col-body { display: flex; flex-direction: column; gap: 10px; min-height: 60px; border-radius: 12px; transition: background .15s, box-shadow .15s; }
+.col-body.col-over { background: var(--accent-dim); box-shadow: inset 0 0 0 1px rgba(194, 242, 79, .35); }
+.col-empty { color: var(--faint); font-size: 12.5px; padding: 10px 4px; }
 .card { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 13px; overflow: hidden; }
 .card:hover { border-color: var(--border-strong); }
 .card .prio { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
