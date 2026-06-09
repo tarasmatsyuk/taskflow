@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { API_URL } from '../../../../lib/api';
+import { api } from '../../../../lib/api';
 import {
   clearAuthCookies,
   getRefreshToken,
@@ -14,18 +14,17 @@ export async function POST() {
     return NextResponse.json({ message: 'No session' }, { status: 401 });
   }
 
-  const res = await fetch(`${API_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${refreshToken}` },
-  });
+  const res = await api.post<AuthResponse>(
+    '/auth/refresh',
+    {},
+    { headers: { authorization: `Bearer ${refreshToken}` } },
+  );
 
-  const data = await res.json();
-  if (!res.ok) {
+  if (res.status >= 400) {
     await clearAuthCookies(); // refresh token invalid/expired → end session
-    return NextResponse.json(data, { status: res.status });
+    return NextResponse.json(res.data, { status: res.status });
   }
 
-  const auth = data as AuthResponse;
-  await setAuthCookies(auth.accessToken, auth.refreshToken);
-  return NextResponse.json({ user: auth.user });
+  await setAuthCookies(res.data.accessToken, res.data.refreshToken);
+  return NextResponse.json({ user: res.data.user });
 }
