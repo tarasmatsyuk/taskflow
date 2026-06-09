@@ -41,3 +41,33 @@ export interface Paginated<T> {
   data: T[];
   meta: PageMeta;
 }
+
+export type TaskStatus =
+  | 'BACKLOG'
+  | 'TODO'
+  | 'IN_PROGRESS'
+  | 'IN_REVIEW'
+  | 'DONE';
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export interface TaskAssignee {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface Task {
+  id: string;
+  number: number;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  order: number;
+  dueDate: string | null;
+  projectId: string;
+  assigneeId: string | null;
+  assignee: TaskAssignee | null;
+  createdAt: string;
+  updatedAt: string;
+}
