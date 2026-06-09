@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Logo } from '../../components/logo';
 import { LogoutButton } from '../../components/logout-button';
 import { apiGet } from '../../lib/server-api';
@@ -32,7 +33,7 @@ export default async function ProjectsPage() {
         {projects.map((p) => {
           const s = STATUS_STYLE[p.status];
           return (
-            <div className="pcard" key={p.id}>
+            <Link className="pcard" key={p.id} href={`/projects/${p.id}`}>
               <div className="accent" style={{ background: p.color }} />
               <div className="body">
                 <div className="pcard-top">
@@ -58,7 +59,7 @@ export default async function ProjectsPage() {
                 </div>
                 <p className="pdesc">{p.description ?? 'No description'}</p>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
