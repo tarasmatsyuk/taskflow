@@ -74,6 +74,13 @@ const TF_TASKS = [
   { number: 7, title: 'WebSocket gateway for live board updates', status: TaskStatus.BACKLOG, priority: TaskPriority.MEDIUM, order: 1000 },
 ];
 
+const TF_LABELS = [
+  { name: 'backend', color: '#34d399' },
+  { name: 'frontend', color: '#38bdf8' },
+  { name: 'infra', color: '#fbbf24' },
+  { name: 'auth', color: '#fb7185' },
+];
+
 async function main() {
   const passwordHash = await argon2.hash(DEMO_PASSWORD);
   const owner = await prisma.user.upsert({
@@ -96,7 +103,7 @@ async function main() {
       create: { projectId: p.id, userId: owner.id, role: MemberRole.OWNER },
     });
 
-    // Seed tasks only for the flagship TF project.
+    // Seed tasks + labels only for the flagship TF project.
     if (project.key === 'TF') {
       for (const task of TF_TASKS) {
         await prisma.task.upsert({
@@ -105,16 +112,24 @@ async function main() {
           create: { ...task, projectId: p.id, assigneeId: owner.id },
         });
       }
+      for (const label of TF_LABELS) {
+        await prisma.label.upsert({
+          where: { projectId_name: { projectId: p.id, name: label.name } },
+          update: { color: label.color },
+          create: { ...label, projectId: p.id },
+        });
+      }
     }
   }
 
-  const [projects, members, tasks] = await Promise.all([
+  const [projects, members, tasks, labels] = await Promise.all([
     prisma.project.count(),
     prisma.projectMember.count(),
     prisma.task.count(),
+    prisma.label.count(),
   ]);
   console.log(
-    `🌱 Seeded ${owner.name} + ${projects} projects, ${members} memberships, ${tasks} tasks.`,
+    `🌱 Seeded ${owner.name} + ${projects} projects, ${members} memberships, ${tasks} tasks, ${labels} labels.`,
   );
 }
 

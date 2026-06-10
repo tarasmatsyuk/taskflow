@@ -1,5 +1,6 @@
 import './global.css';
 import type { ReactNode } from 'react';
+import { Providers } from '../components/providers';
 
 export const metadata = {
   title: 'TaskFlow',
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

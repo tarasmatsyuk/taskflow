@@ -8,6 +8,12 @@ export class TaskAssignee {
   @ApiProperty() email!: string;
 }
 
+export class TaskLabel {
+  @ApiProperty() id!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty() color!: string;
+}
+
 /** Response shape for a Task (mirrors the Prisma model). */
 export class TaskEntity {
   @ApiProperty({ example: 'cmq0t2amb00006jma06b8yr1t' })
@@ -42,6 +48,9 @@ export class TaskEntity {
 
   @ApiProperty({ nullable: true, type: () => TaskAssignee })
   assignee!: TaskAssignee | null;
+
+  @ApiProperty({ type: () => [TaskLabel] })
+  labels!: TaskLabel[];
 
   @ApiProperty({ nullable: true, type: String, format: 'date-time' })
   deletedAt!: Date | null;
