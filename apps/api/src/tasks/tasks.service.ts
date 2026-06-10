@@ -45,15 +45,19 @@ export class TasksService {
           priority: dto.priority ?? TaskPriority.MEDIUM,
           dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
           assigneeId: dto.assigneeId,
+          labels: dto.labelIds?.length
+            ? { connect: dto.labelIds.map((id) => ({ id })) }
+            : undefined,
         },
+        include: TasksService.withRelations,
       });
     });
   }
 
-  // Fetch the assignee in the SAME query (one extra JOIN) instead of letting
-  // callers load each task's assignee separately → avoids an N+1.
-  private static readonly withAssignee = {
+  // Fetch assignee + labels in the SAME query (avoids per-task N+1 lookups).
+  private static readonly withRelations = {
     assignee: { select: { id: true, name: true, email: true } },
+    labels: { select: { id: true, name: true, color: true } },
   };
 
   findAll(projectId: string, query: QueryTasksDto) {
@@ -63,8 +67,9 @@ export class TasksService {
         status: query.status,
         assigneeId: query.assigneeId,
         deletedAt: null, // soft-deleted tasks are hidden from normal reads
+        ...(query.labelId && { labels: { some: { id: query.labelId } } }),
       },
-      include: TasksService.withAssignee,
+      include: TasksService.withRelations,
       orderBy: [{ status: 'asc' }, { order: 'asc' }],
     });
   }
@@ -74,7 +79,7 @@ export class TasksService {
     // Excludes soft-deleted tasks → a deleted task reads as 404.
     const task = await this.prisma.task.findFirst({
       where: { id, projectId, deletedAt: null },
-      include: TasksService.withAssignee,
+      include: TasksService.withRelations,
     });
     if (!task) {
       throw new NotFoundException(`Task ${id} not found in project ${projectId}`);
@@ -84,12 +89,16 @@ export class TasksService {
 
   async update(projectId: string, id: string, dto: UpdateTaskDto) {
     await this.findOne(projectId, id); // 404 if missing / wrong project
+    const { labelIds, dueDate, ...rest } = dto;
     return this.prisma.task.update({
       where: { id },
       data: {
-        ...dto,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        ...rest,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+        // `set` replaces the label list, so unchecking a label removes it.
+        labels: labelIds ? { set: labelIds.map((id) => ({ id })) } : undefined,
       },
+      include: TasksService.withRelations,
     });
   }
 

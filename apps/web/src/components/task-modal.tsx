@@ -1,8 +1,9 @@
 'use client';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import type { Task, TaskPriority, TaskStatus } from '../lib/types';
+import type { Label, Task, TaskPriority, TaskStatus } from '../lib/types';
 
 const STATUSES: TaskStatus[] = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 const PRIORITIES: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
@@ -25,6 +26,16 @@ export function TaskModal({
 }) {
   const queryClient = useQueryClient();
   const editing = Boolean(task);
+  const [labelIds, setLabelIds] = useState<string[]>(
+    task?.labels.map((l) => l.id) ?? [],
+  );
+
+  const { data: labels = [] } = useQuery({
+    queryKey: ['labels', projectId],
+    queryFn: async () =>
+      (await axios.get<Label[]>(`/api/projects/${projectId}/labels`)).data,
+  });
+
   const {
     register,
     handleSubmit,
@@ -39,15 +50,22 @@ export function TaskModal({
   });
 
   const save = useMutation({
-    mutationFn: (values: FormValues) =>
-      editing
-        ? axios.patch(`/api/projects/${projectId}/tasks/${task!.id}`, values)
-        : axios.post(`/api/projects/${projectId}/tasks`, values),
+    mutationFn: (values: FormValues) => {
+      const payload = { ...values, labelIds };
+      return editing
+        ? axios.patch(`/api/projects/${projectId}/tasks/${task!.id}`, payload)
+        : axios.post(`/api/projects/${projectId}/tasks`, payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
       onClose();
     },
   });
+
+  const toggleLabel = (id: string) =>
+    setLabelIds((cur) =>
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
+    );
 
   return (
     <div className="scrim" onClick={onClose}>
@@ -94,6 +112,29 @@ export function TaskModal({
               ))}
             </select>
           </div>
+
+          {labels.length > 0 && (
+            <div className="field">
+              <label>Labels</label>
+              <div className="label-picker">
+                {labels.map((l) => {
+                  const on = labelIds.includes(l.id);
+                  return (
+                    <button
+                      type="button"
+                      key={l.id}
+                      className={`chip${on ? ' chip-on' : ''}`}
+                      style={{ color: l.color, borderColor: l.color }}
+                      onClick={() => toggleLabel(l.id)}
+                    >
+                      {on ? '✓ ' : ''}
+                      {l.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {save.isError && (
             <p className="field-error">Failed to save. Please try again.</p>

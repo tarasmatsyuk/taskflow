@@ -13,7 +13,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { useState } from 'react';
-import type { Task, TaskPriority, TaskStatus } from '../lib/types';
+import type { Label, Task, TaskPriority, TaskStatus } from '../lib/types';
 import { TaskModal } from './task-modal';
 
 const COLUMNS: { status: TaskStatus; name: string; dot: string }[] = [
@@ -45,6 +45,19 @@ function CardView({ task, projectKey }: { task: Task; projectKey: string }) {
         </span>
       </div>
       <h4>{task.title}</h4>
+      {task.labels?.length > 0 && (
+        <div className="labels">
+          {task.labels.map((l) => (
+            <span
+              key={l.id}
+              className="lab"
+              style={{ color: l.color, background: `color-mix(in srgb, ${l.color} 16%, transparent)` }}
+            >
+              {l.name}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="card-foot">
         <span className="prio-tag" style={{ color: PRIORITY_COLOR[task.priority] }}>
           {task.priority}
@@ -132,12 +145,19 @@ export function Board({
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   // null = closed; { task } = edit; {} = create.
   const [modal, setModal] = useState<{ task?: Task } | null>(null);
+  const [labelFilter, setLabelFilter] = useState<string | null>(null);
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks', projectId],
     queryFn: async () =>
       (await axios.get<Task[]>(`/api/projects/${projectId}/tasks`)).data,
     initialData: initialTasks,
+  });
+
+  const { data: labels = [] } = useQuery({
+    queryKey: ['labels', projectId],
+    queryFn: async () =>
+      (await axios.get<Label[]>(`/api/projects/${projectId}/labels`)).data,
   });
 
   const move = useMutation({
@@ -177,7 +197,13 @@ export function Board({
   );
 
   const byStatus = (status: TaskStatus) =>
-    tasks.filter((t) => t.status === status).sort((a, b) => a.order - b.order);
+    tasks
+      .filter(
+        (t) =>
+          t.status === status &&
+          (!labelFilter || t.labels.some((l) => l.id === labelFilter)),
+      )
+      .sort((a, b) => a.order - b.order);
 
   function onDragStart(e: DragStartEvent) {
     setActiveTask((e.active.data.current?.task as Task) ?? null);
@@ -199,6 +225,27 @@ export function Board({
   return (
     <>
       <div className="board-toolbar">
+        <div className="filter-chips">
+          {labels.length > 0 && (
+            <button
+              className={`chip${labelFilter === null ? ' chip-on' : ''}`}
+              onClick={() => setLabelFilter(null)}
+            >
+              All
+            </button>
+          )}
+          {labels.map((l) => (
+            <button
+              key={l.id}
+              className={`chip${labelFilter === l.id ? ' chip-on' : ''}`}
+              style={{ color: l.color, borderColor: l.color }}
+              onClick={() => setLabelFilter(labelFilter === l.id ? null : l.id)}
+            >
+              {l.name}
+            </button>
+          ))}
+        </div>
+        <span className="spacer" />
         <button className="btn compact" onClick={() => setModal({})}>
           + New task
         </button>

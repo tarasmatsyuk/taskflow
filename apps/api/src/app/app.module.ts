@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from '../auth/auth.module';
+import { LabelsModule } from '../labels/labels.module';
 import { MembersModule } from '../members/members.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ProjectsModule } from '../projects/projects.module';
@@ -17,6 +18,7 @@ import { HealthController } from './health.controller';
     ProjectsModule,
     TasksModule,
     MembersModule,
+    LabelsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

@@ -56,6 +56,12 @@ export interface TaskAssignee {
   email: string;
 }
 
+export interface Label {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface Task {
   id: string;
   number: number;
@@ -68,6 +74,7 @@ export interface Task {
   projectId: string;
   assigneeId: string | null;
   assignee: TaskAssignee | null;
+  labels: Label[];
   createdAt: string;
   updatedAt: string;
 }
