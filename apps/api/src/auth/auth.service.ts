@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -45,6 +46,52 @@ export class AuthService {
     if (!valid) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    return this.issueSession(user);
+  }
+
+  async googleLogin(credential: string) {
+    const clientId = this.config.getOrThrow<string>('GOOGLE_CLIENT_ID');
+    const client = new OAuth2Client(clientId);
+
+    let payload;
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException('Invalid Google token');
+    }
+
+    if (!payload || !payload.email_verified || !payload.email) {
+      throw new UnauthorizedException('Invalid Google token');
+    }
+
+    const googleId = payload.sub;
+    const email = payload.email;
+    const name = payload.name ?? email.split('@')[0];
+
+    // 1) Already linked by googleId → just issue a session.
+    const byGoogleId = await this.prisma.user.findUnique({ where: { googleId } });
+    if (byGoogleId) {
+      return this.issueSession(byGoogleId);
+    }
+
+    // 2) Existing account with same email → link it to this Google identity.
+    const byEmail = await this.prisma.user.findUnique({ where: { email } });
+    if (byEmail) {
+      const linked = await this.prisma.user.update({
+        where: { id: byEmail.id },
+        data: { googleId },
+      });
+      return this.issueSession(linked);
+    }
+
+    // 3) Brand new user (no passwordHash — Google is the sole credential).
+    const user = await this.prisma.user.create({
+      data: { email, name, googleId },
+    });
     return this.issueSession(user);
   }
 

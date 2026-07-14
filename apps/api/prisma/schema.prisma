@@ -53,6 +53,9 @@ model User {
   role      UserRole @default(USER)
   // Nullable: pre-auth seed rows (and future OAuth users) have no local password.
   passwordHash       String?
+  // Google account id (sub claim) for OAuth users; null for local-password users.
+  // @unique: one Google account maps to one user (also indexes lookups by googleId).
+  googleId           String? @unique
   // Hashed (argon2) current refresh token; rotated on /auth/refresh, null on logout.
   hashedRefreshToken String?
   createdAt DateTime @default(now())

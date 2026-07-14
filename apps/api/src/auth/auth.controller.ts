@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -31,6 +32,15 @@ export class AuthController {
   @ApiOperation({ summary: 'Log in and receive access + refresh tokens' })
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
+  }
+
+  @Post('google')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Log in or register with a Google ID-token and receive tokens',
+  })
+  google(@Body() dto: GoogleAuthDto) {
+    return this.auth.googleLogin(dto.credential);
   }
 
   @Post('refresh')
