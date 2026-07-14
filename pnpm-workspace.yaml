@@ -10,6 +10,7 @@ allowBuilds:
   argon2: true
   esbuild: true
   less: true
+  msgpackr-extract: false
   nx: false
   prisma: true
   sharp: true

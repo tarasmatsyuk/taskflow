@@ -1,5 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, TaskPriority, TaskStatus } from '@prisma/client';
+import { Queue } from 'bullmq';
+import type { Cache } from 'cache-manager';
+import { EventsGateway } from '../realtime/events.gateway';
+import {
+  AssignmentJobData,
+  EMAIL_JOB,
+  EMAIL_QUEUE,
+} from '../mail/mail.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { MoveTaskDto } from './dto/move-task.dto';
@@ -9,10 +19,18 @@ import { TaskEntity } from './entities/task.entity';
 
 const ORDER_GAP = 1000; // spacing between tasks; leaves room for fractional inserts
 const MIN_GAP = 1; // below this, fractional room is exhausted → rebalance
+const BOARD_TTL_MS = 60_000; // board cache is a safety net; invalidated on every write
+
+const boardKey = (projectId: string) => `board:${projectId}`;
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsGateway,
+    @InjectQueue(EMAIL_QUEUE) private readonly emailQueue: Queue,
+    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+  ) {}
 
   async create(projectId: string, dto: CreateTaskDto): Promise<TaskEntity> {
     await this.assertProjectExists(projectId);
@@ -20,7 +38,7 @@ export class TasksService {
 
     // Transaction: derive the next per-project number and the next order
     // within the target column atomically, then create.
-    return this.prisma.$transaction(async (tx) => {
+    const task = await this.prisma.$transaction(async (tx) => {
       const [lastNumbered, lastInColumn] = await Promise.all([
         tx.task.findFirst({
           where: { projectId },
@@ -52,6 +70,13 @@ export class TasksService {
         include: TasksService.withRelations,
       });
     });
+
+    await this.invalidateBoard(projectId);
+    this.events.emitTaskCreated(projectId, task);
+    if (task.assigneeId) {
+      await this.enqueueAssignment(task);
+    }
+    return task;
   }
 
   // Fetch assignee + labels in the SAME query (avoids per-task N+1 lookups).
@@ -60,8 +85,20 @@ export class TasksService {
     labels: { select: { id: true, name: true, color: true } },
   };
 
-  findAll(projectId: string, query: QueryTasksDto) {
-    return this.prisma.task.findMany({
+  async findAll(projectId: string, query: QueryTasksDto) {
+    const isBoardRead =
+      !query.status && !query.assigneeId && !query.labelId;
+
+    // Only the unfiltered board read is cached (that's the hot path the web
+    // board fetches and groups client-side).
+    if (isBoardRead) {
+      const cached = await this.cache.get<TaskEntity[]>(boardKey(projectId));
+      if (cached) {
+        return cached;
+      }
+    }
+
+    const tasks = await this.prisma.task.findMany({
       where: {
         projectId,
         status: query.status,
@@ -72,6 +109,11 @@ export class TasksService {
       include: TasksService.withRelations,
       orderBy: [{ status: 'asc' }, { order: 'asc' }],
     });
+
+    if (isBoardRead) {
+      await this.cache.set(boardKey(projectId), tasks, BOARD_TTL_MS);
+    }
+    return tasks;
   }
 
   async findOne(projectId: string, id: string) {
@@ -88,9 +130,9 @@ export class TasksService {
   }
 
   async update(projectId: string, id: string, dto: UpdateTaskDto) {
-    await this.findOne(projectId, id); // 404 if missing / wrong project
+    const before = await this.findOne(projectId, id); // 404 if missing / wrong project
     const { labelIds, dueDate, ...rest } = dto;
-    return this.prisma.task.update({
+    const task = await this.prisma.task.update({
       where: { id },
       data: {
         ...rest,
@@ -100,6 +142,14 @@ export class TasksService {
       },
       include: TasksService.withRelations,
     });
+
+    await this.invalidateBoard(projectId);
+    this.events.emitTaskUpdated(projectId, task);
+    // Notify only when the assignee actually changed to someone new.
+    if (task.assigneeId && task.assigneeId !== before.assigneeId) {
+      await this.enqueueAssignment(task);
+    }
+    return task;
   }
 
   async remove(projectId: string, id: string) {
@@ -109,18 +159,25 @@ export class TasksService {
       where: { id },
       data: { deletedAt: new Date() },
     });
+    await this.invalidateBoard(projectId);
+    this.events.emitTaskDeleted(projectId, id);
   }
 
   async restore(projectId: string, id: string) {
     // Look up *including* soft-deleted rows so we can revive one.
-    const task = await this.prisma.task.findFirst({ where: { id, projectId } });
-    if (!task) {
+    const existing = await this.prisma.task.findFirst({ where: { id, projectId } });
+    if (!existing) {
       throw new NotFoundException(`Task ${id} not found in project ${projectId}`);
     }
-    return this.prisma.task.update({
+    const task = await this.prisma.task.update({
       where: { id },
       data: { deletedAt: null },
+      include: TasksService.withRelations,
     });
+    await this.invalidateBoard(projectId);
+    // Restore re-adds the card for live boards.
+    this.events.emitTaskCreated(projectId, task);
+    return task;
   }
 
   /**
@@ -128,12 +185,12 @@ export class TasksService {
    * neighbours, computing the fractional order, and writing are consistent.
    */
   async move(projectId: string, id: string, dto: MoveTaskDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const task = await tx.task.findFirst({ where: { id, projectId } });
-      if (!task) {
+    const task = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.task.findFirst({ where: { id, projectId } });
+      if (!existing) {
         throw new NotFoundException(`Task ${id} not found in project ${projectId}`);
       }
-      const status = dto.status ?? task.status;
+      const status = dto.status ?? existing.status;
 
       // Siblings in the target column (excluding the moving task), in order.
       const siblings = await tx.task.findMany({
@@ -164,8 +221,15 @@ export class TasksService {
         await this.rebalance(tx, projectId, status);
       }
 
-      return tx.task.findUniqueOrThrow({ where: { id } });
+      return tx.task.findUniqueOrThrow({
+        where: { id },
+        include: TasksService.withRelations,
+      });
     });
+
+    await this.invalidateBoard(projectId);
+    this.events.emitTaskMoved(projectId, task);
+    return task;
   }
 
   /** Reassign evenly-spaced order values to a column (after fractional exhaustion). */
@@ -194,5 +258,35 @@ export class TasksService {
     if (!project) {
       throw new NotFoundException(`Project ${projectId} not found`);
     }
+  }
+
+  private invalidateBoard(projectId: string) {
+    return this.cache.del(boardKey(projectId));
+  }
+
+  /** Enqueue an assignment-notification email for a task's current assignee. */
+  private async enqueueAssignment(task: {
+    id: string;
+    number: number;
+    title: string;
+    projectId: string;
+    assigneeId: string | null;
+    assignee?: { name: string; email: string } | null;
+  }) {
+    if (!task.assignee) return;
+    const project = await this.prisma.project.findUnique({
+      where: { id: task.projectId },
+      select: { key: true },
+    });
+    const data: AssignmentJobData = {
+      to: task.assignee.email,
+      assigneeName: task.assignee.name,
+      taskTitle: task.title,
+      taskNumber: task.number,
+      projectKey: project?.key ?? 'TF',
+      projectId: task.projectId,
+      taskId: task.id,
+    };
+    await this.emailQueue.add(EMAIL_JOB.assignment, data);
   }
 }

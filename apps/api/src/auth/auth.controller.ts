@@ -7,6 +7,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { LoginDto } from './dto/login.dto';
@@ -16,7 +17,12 @@ import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { AuthService } from './auth.service';
 import { RefreshUser } from './types/jwt-payload';
 
+// Scope rate limiting to auth only (credential-guessing surface): 10 req/min
+// per IP across these routes. ThrottlerGuard is NOT registered globally, so the
+// rest of the API is unaffected.
 @ApiTags('auth')
+@UseGuards(ThrottlerGuard)
+@Throttle({ default: { limit: 10, ttl: 60_000 } })
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}

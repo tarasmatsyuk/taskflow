@@ -64,6 +64,7 @@ model User {
   projects      Project[] // projects this user owns
   memberships   ProjectMember[] // projects this user belongs to
   assignedTasks Task[]          @relation("TaskAssignee")
+  attachments   Attachment[]    @relation("UploadedAttachments") // files this user uploaded
 }
 
 model Project {
@@ -102,7 +103,8 @@ model Task {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  labels Label[] @relation("TaskLabels")
+  labels      Label[]      @relation("TaskLabels")
+  attachments Attachment[] // uploaded files (bytes in MinIO, metadata here)
 
   @@unique([projectId, number])
   // Covers the board query: WHERE projectId (+ status) ORDER BY status, order.
@@ -133,4 +135,22 @@ model Label {
 
   @@unique([projectId, name])
   @@index([projectId])
+}
+
+// File attachment on a task. Bytes live in MinIO (S3-compatible); this row is
+// the metadata for one uploaded object.
+model Attachment {
+  id           String   @id @default(cuid())
+  taskId       String
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  filename     String // original upload name, for display/download
+  mimeType     String
+  size         Int // bytes
+  storageKey   String   @unique // object key/path in the MinIO bucket
+  uploadedById String?
+  // Null the uploader on user deletion rather than removing the attachment row.
+  uploadedBy   User?    @relation("UploadedAttachments", fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@index([taskId])
 }

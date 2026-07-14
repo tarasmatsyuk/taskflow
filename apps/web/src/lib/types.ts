@@ -62,6 +62,17 @@ export interface Label {
   color: string;
 }
 
+export interface Attachment {
+  id: string;
+  taskId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  uploadedById: string;
+  uploadedBy: { id: string; name: string; email: string } | null;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   number: number;
