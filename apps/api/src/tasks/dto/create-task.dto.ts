@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TaskPriority, TaskStatus } from '@prisma/client';
 import {
+  IsArray,
   IsEnum,
   IsISO8601,
   IsOptional,
@@ -39,6 +40,12 @@ export class CreateTaskDto {
   @IsOptional()
   @IsString()
   assigneeId?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Label ids to attach' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  labelIds?: string[];
 
   // number + order are server-assigned, not accepted from the client.
 }

@@ -12,4 +12,9 @@ export class QueryTasksDto {
   @IsOptional()
   @IsString()
   assigneeId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter to tasks carrying this label id.' })
+  @IsOptional()
+  @IsString()
+  labelId?: string;
 }
