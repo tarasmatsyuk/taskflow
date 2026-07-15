@@ -12,9 +12,13 @@ import {
 } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { io, type Socket } from 'socket.io-client';
 import type { Label, Task, TaskPriority, TaskStatus } from '../lib/types';
 import { TaskModal } from './task-modal';
+
+// Bare API origin for the realtime socket (NOT the /api BFF prefix).
+const WS_URL = process.env.NEXT_PUBLIC_API_WS_URL ?? 'http://localhost:4200';
 
 const COLUMNS: { status: TaskStatus; name: string; dot: string }[] = [
   { status: 'BACKLOG', name: 'Backlog', dot: 'var(--faint)' },
@@ -159,6 +163,53 @@ export function Board({
     queryFn: async () =>
       (await axios.get<Label[]>(`/api/projects/${projectId}/labels`)).data,
   });
+
+  // Realtime: subscribe to this project's room and fold live task events into
+  // the TanStack Query cache (no refetch). Upsert-by-id makes events idempotent,
+  // so the local user's own optimistic mutations just re-settle to server truth.
+  useEffect(() => {
+    let socket: Socket | null = null;
+    let cancelled = false;
+
+    const upsert = (task: Task) =>
+      queryClient.setQueryData<Task[]>(['tasks', projectId], (old = []) =>
+        old.some((t) => t.id === task.id)
+          ? old.map((t) => (t.id === task.id ? task : t))
+          : [...old, task],
+      );
+    const drop = (id: string) =>
+      queryClient.setQueryData<Task[]>(['tasks', projectId], (old = []) =>
+        old.filter((t) => t.id !== id),
+      );
+
+    (async () => {
+      try {
+        const { data, status } = await axios.get<{ token: string }>(
+          '/api/realtime/token',
+        );
+        if (cancelled || status >= 400 || !data?.token) return;
+        socket = io(WS_URL, {
+          auth: { token: data.token },
+          transports: ['websocket'],
+        });
+        socket.on('connect', () => socket?.emit('join', { projectId }));
+        socket.on('task.created', upsert);
+        socket.on('task.updated', upsert);
+        socket.on('task.moved', upsert);
+        socket.on('task.deleted', (p: { id: string }) => drop(p.id));
+      } catch {
+        // Realtime is best-effort; the board still works without it.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (socket) {
+        socket.emit('leave', { projectId });
+        socket.disconnect();
+      }
+    };
+  }, [projectId, queryClient]);
 
   const move = useMutation({
     mutationFn: (vars: { taskId: string; status: TaskStatus; position: number }) =>

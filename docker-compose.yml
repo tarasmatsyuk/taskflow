@@ -16,5 +16,25 @@ services:
     restart: unless-stopped
     ports: ['6379:6379']
 
+  # Object storage for task attachments (S3-compatible). API :9000, console :9001.
+  minio:
+    image: minio/minio
+    container_name: taskflow-minio
+    restart: unless-stopped
+    ports: ['9000:9000', '9001:9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    command: server /data --console-address ":9001"
+    volumes: ['miniodata:/data']
+
+  # Dev SMTP sink for outgoing mail. SMTP :1025, web UI :8025.
+  mailhog:
+    image: mailhog/mailhog
+    container_name: taskflow-mailhog
+    restart: unless-stopped
+    ports: ['1025:1025', '8025:8025']
+
 volumes:
   pgdata:
+  miniodata:

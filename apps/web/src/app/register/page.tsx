@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { AuthAside } from '../../components/auth-aside';
+import { GoogleButton } from '../../components/google-button';
 import { Logo } from '../../components/logo';
 
 type RegisterForm = { name: string; email: string; password: string };
@@ -120,6 +121,8 @@ export default function RegisterPage() {
           <button className="btn" type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Creating account…' : 'Create account'}
           </button>
+
+          <GoogleButton onError={setServerError} />
 
           <p className="auth-foot">
             Already have an account?{' '}

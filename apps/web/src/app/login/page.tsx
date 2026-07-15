@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { AuthAside } from '../../components/auth-aside';
+import { GoogleButton } from '../../components/google-button';
 import { Logo } from '../../components/logo';
 
 type LoginForm = { email: string; password: string };
@@ -98,6 +99,8 @@ export default function LoginPage() {
           <button className="btn" type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Signing in…' : 'Sign in'}
           </button>
+
+          <GoogleButton onError={setServerError} />
 
           <p className="auth-foot">
             New to TaskFlow?{' '}
